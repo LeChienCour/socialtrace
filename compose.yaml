@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    environment:
+      SOCIALTRACE_POSTGRES_HOST: db
+      SOCIALTRACE_POSTGRES_PORT: "5432"
+      SOCIALTRACE_POSTGRES_DB: ${POSTGRES_DB}
+      SOCIALTRACE_POSTGRES_USER: ${POSTGRES_USER}
+      SOCIALTRACE_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SOCIALTRACE_API_TOKEN: ${SOCIALTRACE_API_TOKEN}
+      SOCIALTRACE_ENVIRONMENT: ${SOCIALTRACE_ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Migrations run before serving on every start — idempotent, fine for a
+    # single-replica self-hosted deployment. Revisit if replicas ever race.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn socialtrace.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  caddy:
+    build: ./caddy
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backup:
+    build: ./backup
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    # Phase 0 stub — reserves the topology slot (own volume, no dependents,
+    # never needs postgres-client in the backend image). Real cron + pg_dump
+    # logic lands in phase 5. See docs/adr/0004.
+
+volumes:
+  db_data:
+  backup_data:

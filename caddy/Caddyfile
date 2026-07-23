@@ -1,0 +1,17 @@
+:8080 {
+	# Caddy's own healthcheck target (proxies straight to backend's liveness
+	# endpoint). Distinct from /api/healthz below, which the frontend calls
+	# to prove Caddy -> backend routing end to end — not a duplicate route.
+	handle /healthz {
+		reverse_proxy backend:8000
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
