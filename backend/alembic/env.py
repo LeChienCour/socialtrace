@@ -2,6 +2,8 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
+# Import models so they register on Base.metadata before autogenerate runs.
+import socialtrace.models  # noqa: F401
 from alembic import context
 from socialtrace.db.base import Base
 from socialtrace.settings import settings
@@ -19,9 +21,7 @@ if config.config_file_name is not None:
 # rather than maintaining a separate hardcoded URL in alembic.ini.
 config.set_main_option("sqlalchemy.url", settings.database_url_sync)
 
-# Model metadata for 'autogenerate' support. Phase 0 has no models yet;
-# phase 1 populates Base.metadata by importing models and this wiring
-# needs zero changes.
+# Model metadata for 'autogenerate' support.
 target_metadata = Base.metadata
 
 
