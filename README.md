@@ -18,18 +18,22 @@ See `docs/adr/` for the reasoning behind the core architectural decisions
 (no scraping, capture windows as queries not stored state, Podman/Compose
 Spec).
 
-## Requirements
+## What you need installed
 
-You need two tools installed: **Git** (to get the code) and a **container
-engine** (to run it) — either Docker or Podman.
+Two things, total. Nothing else.
 
-- **Docker** is the common choice if you just want to run the app. Runs a
-  background service (the Docker daemon).
-- **Podman** is a daemonless, rootless alternative — what this project's own
-  maintainers use day to day. Nothing in `compose.yaml` is Docker- or
-  Podman-specific; either works.
+| # | Tool | Why | Pick |
+|---|------|-----|------|
+| 1 | **Git** | to download the code | required |
+| 2 | **Docker** *or* **Podman** | to run the app | pick exactly one |
 
-Pick one container engine — you don't need both.
+That's it — `make` (step 3 below) is optional, purely a convenience.
+
+Don't know Docker vs. Podman? Pick **Docker** — it's the more common default
+and Docker Desktop installs everything in one step. Podman is a
+daemonless/rootless alternative (what this project's own maintainers use),
+but requires one extra command on Windows/macOS (a small VM). Either works —
+`compose.yaml` isn't tied to one or the other.
 
 ### 1. Install Git
 
