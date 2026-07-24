@@ -101,6 +101,14 @@ export interface PostCreate {
   published_at: string;
 }
 
+export interface PostUpdate {
+  url?: string | null;
+  description?: string | null;
+  content_type?: ContentType | null;
+  campaign?: string | null;
+  published_at?: string;
+}
+
 export interface TaskItem {
   type: "account" | "post";
   target_id: string;
@@ -144,6 +152,13 @@ export const api = {
     apiFetch(`/posts${accountId ? `?account_id=${accountId}` : ""}`),
   createPost: (payload: PostCreate): Promise<Post> =>
     apiFetch("/posts", { method: "POST", body: JSON.stringify(payload) }),
+  updatePost: (postId: string, payload: PostUpdate): Promise<Post> =>
+    apiFetch(`/posts/${postId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deletePost: (postId: string): Promise<void> =>
+    apiFetch(`/posts/${postId}`, { method: "DELETE" }),
   listTasks: (): Promise<TaskItem[]> => apiFetch("/tasks"),
   createAccountSnapshot: (
     accountId: string,

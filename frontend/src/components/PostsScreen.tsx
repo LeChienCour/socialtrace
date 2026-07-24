@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { EditPostModal } from "@/components/EditPostModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "@/lib/api";
+import { api, type Post } from "@/lib/api";
 
 function toDatetimeLocal(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -27,6 +28,7 @@ export function PostsScreen() {
     toDatetimeLocal(new Date()),
   );
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Post | null>(null);
 
   const createPost = useMutation({
     mutationFn: api.createPost,
@@ -110,14 +112,33 @@ export function PostsScreen() {
           <li className="text-sm text-muted-foreground">Loading…</li>
         )}
         {posts?.map((post) => (
-          <li key={post.id} className="rounded-lg border p-3 text-sm">
-            <span className="font-medium">{post.description || post.url}</span>
-            <div className="text-muted-foreground">
-              published {new Date(post.published_at).toLocaleString()}
+          <li
+            key={post.id}
+            className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+          >
+            <div>
+              <span className="font-medium">
+                {post.description || post.url}
+              </span>
+              <div className="text-muted-foreground">
+                published {new Date(post.published_at).toLocaleString()}
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(post)}
+            >
+              Edit
+            </Button>
           </li>
         ))}
       </ul>
+
+      {editing && (
+        <EditPostModal post={editing} onClose={() => setEditing(null)} />
+      )}
     </div>
   );
 }
