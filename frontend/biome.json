@@ -12,6 +12,12 @@
   },
   "formatter": { "enabled": true, "indentStyle": "space" },
   "linter": { "enabled": true, "rules": { "preset": "recommended" } },
+  "overrides": [
+    {
+      "includes": ["src/components/ui/**"],
+      "linter": { "rules": { "a11y": { "noLabelWithoutControl": "off" } } }
+    }
+  ],
   "assist": { "actions": { "preset": "recommended" } },
   "javascript": { "formatter": { "quoteStyle": "double" } },
   "css": { "parser": { "tailwindDirectives": true } }

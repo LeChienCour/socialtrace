@@ -1,36 +1,48 @@
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { AccountsScreen } from "@/components/AccountsScreen";
+import { PostsScreen } from "@/components/PostsScreen";
+import { TaskTray } from "@/components/TaskTray";
+import { TokenGate } from "@/components/TokenGate";
+import { cn } from "@/lib/utils";
 
-interface HealthResponse {
-  status: string;
-}
+type View = "tasks" | "accounts" | "posts";
 
-async function fetchHealth(): Promise<HealthResponse> {
-  const response = await fetch("/api/healthz");
-  if (!response.ok) {
-    throw new Error(`unexpected status ${response.status}`);
-  }
-  return response.json();
-}
+const TABS: { key: View; label: string }[] = [
+  { key: "tasks", label: "Tasks" },
+  { key: "accounts", label: "Accounts" },
+  { key: "posts", label: "Posts" },
+];
 
 function App() {
-  const { data, isError, isPending } = useQuery({
-    queryKey: ["health"],
-    queryFn: fetchHealth,
-  });
-
-  const apiStatus = isPending
-    ? "checking..."
-    : isError
-      ? "API: unreachable"
-      : `API: ${data.status}`;
+  const [view, setView] = useState<View>("tasks");
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4">
-      <h1 className="text-2xl font-medium">socialtrace</h1>
-      <p data-testid="api-status">{apiStatus}</p>
-      <Button>Placeholder</Button>
-    </div>
+    <TokenGate>
+      <div className="min-h-svh">
+        <header className="border-b">
+          <div className="mx-auto flex max-w-lg items-center gap-1 px-6 py-3">
+            <span className="mr-4 text-sm font-medium">socialtrace</span>
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setView(tab.key)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
+                  view === tab.key && "bg-muted font-medium",
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        {view === "tasks" && <TaskTray />}
+        {view === "accounts" && <AccountsScreen />}
+        {view === "posts" && <PostsScreen />}
+      </div>
+    </TokenGate>
   );
 }
 
