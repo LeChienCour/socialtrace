@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from socialtrace.api.accounts import router as accounts_router
 from socialtrace.api.health import router as health_router
 from socialtrace.api.posts import router as posts_router
+from socialtrace.api.tasks import router as tasks_router
 from socialtrace.settings import settings
 
 logger = logging.getLogger("socialtrace")
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(accounts_router)
     app.include_router(posts_router)
+    app.include_router(tasks_router)
     return app
 
 
