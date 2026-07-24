@@ -144,6 +144,54 @@ export interface PostSnapshotCreate {
   watch_time_sec?: number | null;
 }
 
+export interface OverviewResponse {
+  total_accounts: number;
+  total_posts: number;
+  captures_last_7d: number;
+  avg_engagement_rate: number | null;
+}
+
+export interface BenchmarkGroup {
+  key: string;
+  avg_engagement_rate: number;
+  sample_size: number;
+}
+
+export interface BenchmarksResponse {
+  by_platform: BenchmarkGroup[];
+  by_content_type: BenchmarkGroup[];
+}
+
+export type GrowthGranularity = "day" | "week" | "month";
+
+export interface GrowthPoint {
+  period_start: string;
+  followers: number | null;
+  reach: number | null;
+  impressions: number | null;
+  profile_visits: number | null;
+}
+
+export interface PostCurvePoint {
+  captured_at: string;
+  hours_since_published: number;
+  window_key: string | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
+  impressions: number | null;
+  engagement_rate: number | null;
+}
+
+export interface PostCurve {
+  post_id: string;
+  label: string;
+  points: PostCurvePoint[];
+}
+
 export const api = {
   listAccounts: (): Promise<Account[]> => apiFetch("/accounts"),
   createAccount: (payload: AccountCreate): Promise<Account> =>
@@ -176,4 +224,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  getOverview: (): Promise<OverviewResponse> => apiFetch("/analytics/overview"),
+  getBenchmarks: (): Promise<BenchmarksResponse> =>
+    apiFetch("/analytics/benchmarks"),
+  getGrowth: (
+    accountId: string,
+    granularity: GrowthGranularity = "day",
+  ): Promise<GrowthPoint[]> =>
+    apiFetch(
+      `/analytics/growth?account_id=${accountId}&granularity=${granularity}`,
+    ),
+  getPostCurves: (postIds: string[]): Promise<PostCurve[]> =>
+    apiFetch(`/analytics/post-curves?ids=${postIds.join(",")}`),
 };
