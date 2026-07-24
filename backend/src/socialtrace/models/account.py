@@ -20,6 +20,8 @@ class Account(Base):
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     timezone: Mapped[str] = mapped_column(String, nullable=False, server_default="UTC")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # Validated as an enum at the app layer (see schemas.account.Cadence).
+    capture_cadence: Mapped[str] = mapped_column(String, nullable=False, server_default="weekly")
     # Not in v1's auth model (single static token), but present from commit 1 —
     # retrofitting ownership onto an ownerless schema is painful later.
     created_by: Mapped[str | None] = mapped_column(String, nullable=True)
