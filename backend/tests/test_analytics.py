@@ -1,6 +1,11 @@
 from datetime import UTC, datetime
 
-from socialtrace.analytics import bucket_account_snapshots, compute_engagement_rate
+from socialtrace.analytics import (
+    PostMetricsLike,
+    bucket_account_snapshots,
+    bucket_posts_by_month,
+    compute_engagement_rate,
+)
 
 
 def test_no_engagement_data_returns_none() -> None:
@@ -71,3 +76,53 @@ def test_bucket_by_month_groups_across_weeks() -> None:
     assert len(points) == 1
     assert points[0].followers == 130
     assert points[0].period_start.day == 1
+
+
+def _post_metrics(
+    published_at: datetime,
+    views: int | None = None,
+    likes: int | None = None,
+    comments: int | None = None,
+    shares: int | None = None,
+    saves: int | None = None,
+    engagement_rate: float | None = None,
+) -> PostMetricsLike:
+    return PostMetricsLike(
+        published_at=published_at,
+        views=views,
+        likes=likes,
+        comments=comments,
+        shares=shares,
+        saves=saves,
+        engagement_rate=engagement_rate,
+    )
+
+
+def test_bucket_posts_by_month_sums_totals_and_averages_rate() -> None:
+    posts = [
+        _post_metrics(datetime(2026, 1, 3, tzinfo=UTC), views=100, likes=10, engagement_rate=0.1),
+        _post_metrics(datetime(2026, 1, 20, tzinfo=UTC), views=200, likes=20, engagement_rate=0.2),
+        _post_metrics(datetime(2026, 2, 1, tzinfo=UTC), views=50, likes=5, engagement_rate=0.05),
+    ]
+    points = bucket_posts_by_month(posts)
+    assert len(points) == 2
+    jan, feb = points
+    assert jan.month_start == datetime(2026, 1, 1).date()
+    assert jan.post_count == 2
+    assert jan.total_views == 300
+    assert jan.total_likes == 30
+    assert jan.avg_engagement_rate is not None
+    assert abs(jan.avg_engagement_rate - 0.15) < 1e-9
+    assert feb.month_start == datetime(2026, 2, 1).date()
+    assert feb.post_count == 1
+
+
+def test_bucket_posts_by_month_ignores_missing_rate_in_average() -> None:
+    posts = [
+        _post_metrics(datetime(2026, 1, 3, tzinfo=UTC), views=100, engagement_rate=None),
+        _post_metrics(datetime(2026, 1, 20, tzinfo=UTC), views=200, engagement_rate=0.2),
+    ]
+    points = bucket_posts_by_month(posts)
+    assert len(points) == 1
+    assert points[0].avg_engagement_rate == 0.2
+    assert points[0].total_views == 300
