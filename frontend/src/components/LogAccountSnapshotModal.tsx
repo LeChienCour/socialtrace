@@ -31,6 +31,9 @@ export function LogAccountSnapshotModal({
 }) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>({});
+  const [capturedDate, setCapturedDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [error, setError] = useState<string | null>(null);
 
   const capture = useMutation({
@@ -42,7 +45,10 @@ export function LogAccountSnapshotModal({
           payload[field] = Number(raw);
         }
       }
-      return api.createAccountSnapshot(account.id, payload);
+      return api.createAccountSnapshot(account.id, {
+        captured_at: `${capturedDate}T12:00:00.000Z`,
+        ...payload,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -68,6 +74,17 @@ export function LogAccountSnapshotModal({
             capture.mutate();
           }}
         >
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label htmlFor="captured_at">Captured on</Label>
+            <Input
+              id="captured_at"
+              type="date"
+              max={new Date().toISOString().slice(0, 10)}
+              value={capturedDate}
+              onChange={(event) => setCapturedDate(event.target.value)}
+            />
+          </div>
+
           {ACCOUNT_FIELDS.map((field) => (
             <div key={field} className="flex flex-col gap-1.5">
               <Label htmlFor={field}>{field.replace(/_/g, " ")}</Label>
