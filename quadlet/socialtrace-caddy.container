@@ -1,0 +1,20 @@
+[Unit]
+Description=socialtrace reverse proxy
+After=socialtrace.network socialtrace-backend.service socialtrace-frontend.service
+Requires=socialtrace-backend.service socialtrace-frontend.service
+
+[Container]
+Image=localhost/socialtrace_caddy:latest
+ContainerName=socialtrace-caddy
+Network=socialtrace.network
+PublishPort=8080:8080
+HealthCmd=wget -qO- http://localhost:8080/healthz
+HealthInterval=5s
+HealthTimeout=5s
+HealthRetries=10
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

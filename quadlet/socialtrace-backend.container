@@ -1,0 +1,30 @@
+[Unit]
+Description=socialtrace backend
+After=socialtrace.network socialtrace-db.service
+Requires=socialtrace-db.service
+
+[Container]
+# Built locally via `podman compose build` (or `make up` once) — Quadlet
+# doesn't do inline builds the way compose does, it needs an image tag that
+# already exists.
+Image=localhost/socialtrace_backend:latest
+ContainerName=socialtrace-backend
+Network=socialtrace.network
+# The caddy image's baked-in Caddyfile (built once, shared by compose and
+# Quadlet) proxies to the bare name "backend" — give it that DNS alias
+# regardless of this container's actual name.
+NetworkAlias=backend
+EnvironmentFile=%h/socialtrace/.env
+Exec=sh -c "alembic upgrade head && uvicorn socialtrace.main:app --host 0.0.0.0 --port 8000"
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')"
+HealthInterval=5s
+HealthTimeout=5s
+HealthRetries=10
+HealthStartPeriod=10s
+
+[Service]
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
