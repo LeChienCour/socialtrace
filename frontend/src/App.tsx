@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { AccountsScreen } from "@/components/AccountsScreen";
 import { DashboardScreen } from "@/components/DashboardScreen";
+import { DataScreen } from "@/components/DataScreen";
 import { PostsScreen } from "@/components/PostsScreen";
 import { TaskTray } from "@/components/TaskTray";
 import { TokenGate } from "@/components/TokenGate";
 import { cn } from "@/lib/utils";
 
-type View = "tasks" | "dashboard" | "accounts" | "posts";
+type View = "tasks" | "dashboard" | "accounts" | "posts" | "data";
 
 const TABS: { key: View; label: string }[] = [
   { key: "tasks", label: "Tasks" },
   { key: "dashboard", label: "Dashboard" },
   { key: "accounts", label: "Accounts" },
   { key: "posts", label: "Posts" },
+  { key: "data", label: "Data" },
 ];
 
 function App() {
@@ -44,6 +46,7 @@ function App() {
         {view === "dashboard" && <DashboardScreen />}
         {view === "accounts" && <AccountsScreen />}
         {view === "posts" && <PostsScreen />}
+        {view === "data" && <DataScreen />}
       </div>
     </TokenGate>
   );

@@ -9,13 +9,12 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(
+async function authFetch(
   path: string,
   options: RequestInit = {},
-): Promise<T> {
+): Promise<globalThis.Response> {
   const token = getStoredToken();
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -29,6 +28,17 @@ async function apiFetch<T>(
     window.location.reload();
     throw new ApiError(401, "invalid API token");
   }
+
+  return response;
+}
+
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  const response = await authFetch(path, { ...options, headers });
 
   if (response.status === 204) {
     return undefined as T;
@@ -45,6 +55,31 @@ async function apiFetch<T>(
   }
 
   return body as T;
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadFile(
+  path: string,
+  fallbackFilename: string,
+): Promise<void> {
+  const response = await authFetch(path);
+  if (!response.ok) {
+    throw new ApiError(response.status, response.statusText);
+  }
+  const disposition = response.headers.get("content-disposition");
+  const match = disposition?.match(/filename="?([^"]+)"?/);
+  const filename = match?.[1] ?? fallbackFilename;
+  triggerBrowserDownload(await response.blob(), filename);
 }
 
 export type Platform =
@@ -192,6 +227,19 @@ export interface PostCurve {
   points: PostCurvePoint[];
 }
 
+export interface BackupInfo {
+  filename: string;
+  size_bytes: number;
+  modified_at: string;
+}
+
+export interface ImportResult {
+  accounts: number;
+  posts: number;
+  account_snapshots: number;
+  post_snapshots: number;
+}
+
 export const api = {
   listAccounts: (): Promise<Account[]> => apiFetch("/accounts"),
   createAccount: (payload: AccountCreate): Promise<Account> =>
@@ -236,4 +284,28 @@ export const api = {
     ),
   getPostCurves: (postIds: string[]): Promise<PostCurve[]> =>
     apiFetch(`/analytics/post-curves?ids=${postIds.join(",")}`),
+  exportJson: (): Promise<void> =>
+    downloadFile("/export?format=json", "socialtrace-export.json"),
+  exportCsv: (): Promise<void> =>
+    downloadFile("/export?format=csv", "socialtrace-export.zip"),
+  listBackups: (): Promise<BackupInfo[]> => apiFetch("/backups"),
+  downloadLatestBackup: (): Promise<void> =>
+    downloadFile("/backups/latest", "socialtrace-backup.sql.gz"),
+  importCsv: async (file: File): Promise<ImportResult> => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await authFetch("/import/csv", {
+      method: "POST",
+      body: form,
+    });
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail =
+        body && typeof body === "object" && "detail" in body
+          ? String((body as { detail: unknown }).detail)
+          : response.statusText;
+      throw new ApiError(response.status, detail);
+    }
+    return body as ImportResult;
+  },
 };

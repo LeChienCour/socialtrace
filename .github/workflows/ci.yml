@@ -38,6 +38,56 @@ jobs:
           context: backend
           push: false
 
+  backup-restore:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: socialtrace
+          POSTGRES_USER: socialtrace
+          POSTGRES_PASSWORD: socialtrace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U socialtrace -d socialtrace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed the source database with known data
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=socialtrace psql -h localhost -U socialtrace -d socialtrace <<'SQL'
+          CREATE TABLE restore_check (id serial primary key, note text);
+          INSERT INTO restore_check (note) VALUES ('a'), ('b'), ('c'), ('d'), ('e');
+          SQL
+
+      - name: Build backup image
+        run: docker build -t socialtrace-backup ./backup
+
+      - name: Run a real pg_dump against the seeded database
+        run: |
+          mkdir -p /tmp/backups/daily
+          docker run --rm --network host \
+            -e POSTGRES_HOST=localhost -e POSTGRES_PORT=5432 \
+            -e POSTGRES_USER=socialtrace -e POSTGRES_PASSWORD=socialtrace -e POSTGRES_DB=socialtrace \
+            -e BACKUP_RUN_ONCE=true \
+            -v /tmp/backups:/backups \
+            socialtrace-backup
+          test -n "$(ls /tmp/backups/daily/*.sql.gz 2>/dev/null)"
+
+      - name: Restore the dump into a fresh database and validate row counts
+        run: |
+          PGPASSWORD=socialtrace psql -h localhost -U socialtrace -d postgres -c "DROP DATABASE IF EXISTS restore_target;"
+          PGPASSWORD=socialtrace psql -h localhost -U socialtrace -d postgres -c "CREATE DATABASE restore_target;"
+          gunzip -c /tmp/backups/daily/*.sql.gz | PGPASSWORD=socialtrace psql -h localhost -U socialtrace -d restore_target
+          count=$(PGPASSWORD=socialtrace psql -h localhost -U socialtrace -d restore_target -tAc "SELECT count(*) FROM restore_check;")
+          echo "restored row count: $count"
+          test "$count" = "5"
+
   frontend:
     runs-on: ubuntu-latest
     steps:

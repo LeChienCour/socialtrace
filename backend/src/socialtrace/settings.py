@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # but the field lives here from commit 1 so nothing needs restructuring later.
     api_token: str | None = None
 
+    # Read-only mount of the backup sidecar's volume (see compose.yaml) —
+    # backend only ever reads pre-generated dumps here, never writes or
+    # shells out to pg_dump itself.
+    backup_dir: str = "/backups"
+
     @property
     def database_url(self) -> str:
         return (
