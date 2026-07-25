@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from socialtrace.analytics import (
     GrowthGranularity,
+    PostMetricsLike,
     bucket_account_snapshots,
+    bucket_posts_by_month,
     compute_engagement_rate,
 )
 from socialtrace.api.auth import require_api_token
@@ -19,9 +21,11 @@ from socialtrace.schemas.analytics import (
     BenchmarkGroup,
     BenchmarksResponse,
     GrowthPointResponse,
+    MonthlyPointResponse,
     OverviewResponse,
     PostCurve,
     PostCurvePoint,
+    PostTimelinePoint,
 )
 
 router = APIRouter(
@@ -108,8 +112,16 @@ async def benchmarks(session: DbSession) -> BenchmarksResponse:
     latest_snapshots = await _latest_post_snapshots(session)
     followers_by_account = await _latest_account_followers(session)
 
-    by_platform: dict[str, list[float]] = defaultdict(list)
-    by_content_type: dict[str, list[float]] = defaultdict(list)
+    # Benchmarks answer "which platform/format performs best, and by what
+    # measure" — engagement rate alone hides whether that rate comes from a
+    # handful of views or tens of thousands, so track raw views/reach/likes
+    # alongside it per group.
+    by_platform: dict[str, list[tuple[float | None, int | None, int | None, int | None]]] = (
+        defaultdict(list)
+    )
+    by_content_type: dict[str, list[tuple[float | None, int | None, int | None, int | None]]] = (
+        defaultdict(list)
+    )
 
     for post in posts:
         snapshot = latest_snapshots.get(post.id)
@@ -127,23 +139,151 @@ async def benchmarks(session: DbSession) -> BenchmarksResponse:
             snapshot.impressions,
             followers_by_account.get(post.account_id),
         )
-        if rate is None:
-            continue
-        by_platform[account.platform].append(rate)
+        row = (rate, snapshot.views, snapshot.reach, snapshot.likes)
+        by_platform[account.platform].append(row)
         if post.content_type:
-            by_content_type[post.content_type].append(rate)
+            by_content_type[post.content_type].append(row)
 
-    def summarize(groups: dict[str, list[float]]) -> list[BenchmarkGroup]:
-        return [
-            BenchmarkGroup(
-                key=key, avg_engagement_rate=sum(values) / len(values), sample_size=len(values)
+    def avg(values: list[int | None]) -> float | None:
+        present = [v for v in values if v is not None]
+        return sum(present) / len(present) if present else None
+
+    def summarize(
+        groups: dict[str, list[tuple[float | None, int | None, int | None, int | None]]],
+    ) -> list[BenchmarkGroup]:
+        result = []
+        for key, rows in sorted(groups.items()):
+            rates = [r for r, _, _, _ in rows if r is not None]
+            if not rates:
+                continue
+            result.append(
+                BenchmarkGroup(
+                    key=key,
+                    avg_engagement_rate=sum(rates) / len(rates),
+                    avg_views=avg([v for _, v, _, _ in rows]),
+                    avg_reach=avg([re for _, _, re, _ in rows]),
+                    avg_likes=avg([lk for _, _, _, lk in rows]),
+                    sample_size=len(rows),
+                )
             )
-            for key, values in sorted(groups.items())
-        ]
+        return result
 
     return BenchmarksResponse(
         by_platform=summarize(by_platform), by_content_type=summarize(by_content_type)
     )
+
+
+@router.get("/monthly", response_model=list[MonthlyPointResponse])
+async def monthly(session: DbSession, account_id: uuid.UUID) -> list[MonthlyPointResponse]:
+    """Month-by-month rollup of every post published under one account —
+    totals for size (views/likes/comments/shares/saves) plus an average
+    engagement rate, so a CM can compare "how did this account do this
+    month vs last month" instead of only ever looking at one post."""
+    account = await session.get(Account, account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="account not found")
+
+    posts = (
+        (await session.execute(select(Post).where(Post.account_id == account_id))).scalars().all()
+    )
+    latest_snapshots = await _latest_post_snapshots(session)
+    followers = (await _latest_account_followers(session)).get(account_id)
+
+    metrics = []
+    for post in posts:
+        snapshot = latest_snapshots.get(post.id)
+        rate = (
+            compute_engagement_rate(
+                snapshot.likes,
+                snapshot.comments,
+                snapshot.shares,
+                snapshot.saves,
+                snapshot.reach,
+                snapshot.impressions,
+                followers,
+            )
+            if snapshot is not None
+            else None
+        )
+        metrics.append(
+            PostMetricsLike(
+                published_at=post.published_at,
+                views=snapshot.views if snapshot else None,
+                likes=snapshot.likes if snapshot else None,
+                comments=snapshot.comments if snapshot else None,
+                shares=snapshot.shares if snapshot else None,
+                saves=snapshot.saves if snapshot else None,
+                engagement_rate=rate,
+            )
+        )
+
+    return [
+        MonthlyPointResponse(
+            month_start=point.month_start,
+            post_count=point.post_count,
+            total_views=point.total_views,
+            total_likes=point.total_likes,
+            total_comments=point.total_comments,
+            total_shares=point.total_shares,
+            total_saves=point.total_saves,
+            avg_engagement_rate=point.avg_engagement_rate,
+        )
+        for point in bucket_posts_by_month(metrics)
+    ]
+
+
+@router.get("/posts-timeline", response_model=list[PostTimelinePoint])
+async def posts_timeline(session: DbSession, account_id: uuid.UUID) -> list[PostTimelinePoint]:
+    """Every post of one account, oldest to newest, with its latest captured
+    metrics — a real line across the account's whole history rather than a
+    single post's h24/d7/d30 (three points is barely a line, let alone a
+    curve)."""
+    account = await session.get(Account, account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="account not found")
+
+    posts = (
+        (
+            await session.execute(
+                select(Post).where(Post.account_id == account_id).order_by(Post.published_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    latest_snapshots = await _latest_post_snapshots(session)
+    followers = (await _latest_account_followers(session)).get(account_id)
+
+    points = []
+    for post in posts:
+        snapshot = latest_snapshots.get(post.id)
+        rate = (
+            compute_engagement_rate(
+                snapshot.likes,
+                snapshot.comments,
+                snapshot.shares,
+                snapshot.saves,
+                snapshot.reach,
+                snapshot.impressions,
+                followers,
+            )
+            if snapshot is not None
+            else None
+        )
+        points.append(
+            PostTimelinePoint(
+                post_id=post.id,
+                label=post.description or post.url or str(post.id),
+                published_at=post.published_at,
+                views=snapshot.views if snapshot else None,
+                likes=snapshot.likes if snapshot else None,
+                comments=snapshot.comments if snapshot else None,
+                shares=snapshot.shares if snapshot else None,
+                reach=snapshot.reach if snapshot else None,
+                engagement_rate=rate,
+            )
+        )
+    return points
 
 
 @router.get("/growth", response_model=list[GrowthPointResponse])

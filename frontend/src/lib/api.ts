@@ -189,6 +189,9 @@ export interface OverviewResponse {
 export interface BenchmarkGroup {
   key: string;
   avg_engagement_rate: number;
+  avg_views: number | null;
+  avg_reach: number | null;
+  avg_likes: number | null;
   sample_size: number;
 }
 
@@ -196,6 +199,31 @@ export interface BenchmarksResponse {
   by_platform: BenchmarkGroup[];
   by_content_type: BenchmarkGroup[];
 }
+
+export type BenchmarkMetric =
+  | "avg_engagement_rate"
+  | "avg_views"
+  | "avg_reach"
+  | "avg_likes";
+
+export interface MonthlyPoint {
+  month_start: string;
+  post_count: number;
+  total_views: number;
+  total_likes: number;
+  total_comments: number;
+  total_shares: number;
+  total_saves: number;
+  avg_engagement_rate: number | null;
+}
+
+export type MonthlyMetric =
+  | "total_views"
+  | "total_likes"
+  | "total_comments"
+  | "total_shares"
+  | "total_saves"
+  | "avg_engagement_rate";
 
 export type GrowthGranularity = "day" | "week" | "month";
 
@@ -207,25 +235,25 @@ export interface GrowthPoint {
   profile_visits: number | null;
 }
 
-export interface PostCurvePoint {
-  captured_at: string;
-  hours_since_published: number;
-  window_key: string | null;
+export interface PostTimelinePoint {
+  post_id: string;
+  label: string;
+  published_at: string;
   views: number | null;
   likes: number | null;
   comments: number | null;
   shares: number | null;
-  saves: number | null;
   reach: number | null;
-  impressions: number | null;
   engagement_rate: number | null;
 }
 
-export interface PostCurve {
-  post_id: string;
-  label: string;
-  points: PostCurvePoint[];
-}
+export type PostTimelineMetric =
+  | "views"
+  | "likes"
+  | "comments"
+  | "shares"
+  | "reach"
+  | "engagement_rate";
 
 export interface BackupInfo {
   filename: string;
@@ -282,8 +310,10 @@ export const api = {
     apiFetch(
       `/analytics/growth?account_id=${accountId}&granularity=${granularity}`,
     ),
-  getPostCurves: (postIds: string[]): Promise<PostCurve[]> =>
-    apiFetch(`/analytics/post-curves?ids=${postIds.join(",")}`),
+  getMonthly: (accountId: string): Promise<MonthlyPoint[]> =>
+    apiFetch(`/analytics/monthly?account_id=${accountId}`),
+  getPostsTimeline: (accountId: string): Promise<PostTimelinePoint[]> =>
+    apiFetch(`/analytics/posts-timeline?account_id=${accountId}`),
   exportJson: (): Promise<void> =>
     downloadFile("/export?format=json", "socialtrace-export.json"),
   exportCsv: (): Promise<void> =>

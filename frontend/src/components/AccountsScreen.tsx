@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { LogAccountSnapshotModal } from "@/components/LogAccountSnapshotModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, type Platform } from "@/lib/api";
+import { type Account, api, type Platform } from "@/lib/api";
 
 const PLATFORMS: Platform[] = [
   "instagram",
@@ -21,6 +22,8 @@ export function AccountsScreen() {
     queryKey: ["accounts"],
     queryFn: api.listAccounts,
   });
+
+  const [snapshotAccount, setSnapshotAccount] = useState<Account | null>(null);
 
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [handle, setHandle] = useState("");
@@ -100,16 +103,35 @@ export function AccountsScreen() {
           <li className="text-sm text-muted-foreground">Loading…</li>
         )}
         {accounts?.map((account) => (
-          <li key={account.id} className="rounded-lg border p-3 text-sm">
-            <span className="font-medium">
-              {account.display_name || account.handle}
-            </span>{" "}
-            <span className="text-muted-foreground">
-              @{account.handle} · {account.platform}
+          <li
+            key={account.id}
+            className="flex items-center justify-between rounded-lg border p-3 text-sm"
+          >
+            <span>
+              <span className="font-medium">
+                {account.display_name || account.handle}
+              </span>{" "}
+              <span className="text-muted-foreground">
+                @{account.handle} · {account.platform}
+              </span>
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSnapshotAccount(account)}
+            >
+              Log snapshot
+            </Button>
           </li>
         ))}
       </ul>
+
+      {snapshotAccount && (
+        <LogAccountSnapshotModal
+          account={snapshotAccount}
+          onClose={() => setSnapshotAccount(null)}
+        />
+      )}
     </div>
   );
 }

@@ -40,6 +40,64 @@ def compute_engagement_rate(
     return numerator / denominator
 
 
+@dataclass(frozen=True)
+class PostMetricsLike:
+    """The subset of a post's latest snapshot needed to fold it into a
+    monthly aggregate — decoupled from the ORM model so this stays a pure
+    function callers can unit-test without a DB."""
+
+    published_at: datetime
+    views: int | None
+    likes: int | None
+    comments: int | None
+    shares: int | None
+    saves: int | None
+    engagement_rate: float | None
+
+
+@dataclass(frozen=True)
+class MonthlyPoint:
+    month_start: date
+    post_count: int
+    total_views: int
+    total_likes: int
+    total_comments: int
+    total_shares: int
+    total_saves: int
+    avg_engagement_rate: float | None
+
+
+def bucket_posts_by_month(posts: list[PostMetricsLike]) -> list[MonthlyPoint]:
+    """One point per calendar month a post was published in, summing raw
+    interaction counts (a real total, unlike account snapshots which can
+    only take the latest reading) and averaging engagement rate across the
+    posts published that month."""
+    by_month: dict[date, list[PostMetricsLike]] = {}
+    for post in posts:
+        key = post.published_at.date().replace(day=1)
+        by_month.setdefault(key, []).append(post)
+
+    def total(values: list[int | None]) -> int:
+        return sum(v for v in values if v is not None)
+
+    points = []
+    for month_start, group in sorted(by_month.items()):
+        rates = [p.engagement_rate for p in group if p.engagement_rate is not None]
+        points.append(
+            MonthlyPoint(
+                month_start=month_start,
+                post_count=len(group),
+                total_views=total([p.views for p in group]),
+                total_likes=total([p.likes for p in group]),
+                total_comments=total([p.comments for p in group]),
+                total_shares=total([p.shares for p in group]),
+                total_saves=total([p.saves for p in group]),
+                avg_engagement_rate=sum(rates) / len(rates) if rates else None,
+            )
+        )
+    return points
+
+
 class AccountSnapshotLike(Protocol):
     captured_at: datetime
     followers: int | None
