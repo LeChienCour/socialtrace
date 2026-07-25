@@ -1,0 +1,23 @@
+[Unit]
+Description=socialtrace PostgreSQL database
+After=socialtrace.network
+
+[Container]
+Image=docker.io/library/postgres:16-alpine
+ContainerName=socialtrace-db
+Network=socialtrace.network
+Volume=socialtrace-db-data.volume:/var/lib/postgresql/data
+# Reuses the same .env compose reads — clone the repo to ~/socialtrace, or
+# edit this path if you cloned it elsewhere.
+EnvironmentFile=%h/socialtrace/.env
+HealthCmd=pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+HealthInterval=5s
+HealthTimeout=5s
+HealthRetries=10
+HealthStartPeriod=10s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

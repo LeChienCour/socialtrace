@@ -1,0 +1,20 @@
+[Unit]
+Description=socialtrace frontend
+After=socialtrace.network
+
+[Container]
+Image=localhost/socialtrace_frontend:latest
+ContainerName=socialtrace-frontend
+Network=socialtrace.network
+# See the matching comment in socialtrace-backend.container.
+NetworkAlias=frontend
+HealthCmd=wget -qO- http://localhost:3000/
+HealthInterval=5s
+HealthTimeout=5s
+HealthRetries=10
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=socialtrace backup sidecar
+After=socialtrace.network socialtrace-db.service
+Requires=socialtrace-db.service
+
+[Container]
+Image=localhost/socialtrace_backup:latest
+ContainerName=socialtrace-backup
+Network=socialtrace.network
+Volume=socialtrace-backup-data.volume:/backups
+Environment=POSTGRES_HOST=socialtrace-db
+Environment=POSTGRES_PORT=5432
+EnvironmentFile=%h/socialtrace/.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

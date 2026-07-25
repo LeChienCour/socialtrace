@@ -7,12 +7,12 @@ the thing no platform's native export gives you.
 
 ## Status
 
-Early — phase 0 of a 7-phase roadmap (scaffolding stage). Right now this is a
-developer-facing skeleton: no account/post management screens yet, no demo
-data, no setup wizard. Running it today requires the tools listed below and
-some comfort with a terminal. It is **not yet** something a non-technical
-Community Manager can install and use unassisted — that's the goal, not the
-current state.
+Functional end to end: accounts/posts CRUD, the capture-window task tray,
+snapshot capture, the analytics dashboard (post curves, account growth,
+benchmarks), CSV/JSON export+import, and automated daily backups. Running it
+still requires the tools listed below and some comfort with a terminal —
+there's no installer or setup wizard, and it's built as a personal tool for
+a single Community Manager's own machine, not a multi-user hosted product.
 
 See `docs/adr/` for the reasoning behind the core architectural decisions
 (no scraping, capture windows as queries not stored state, Podman/Compose
@@ -101,6 +101,17 @@ make ps        # check service health
 make down      # stop everything
 make clean     # stop everything and delete the database volume
 ```
+
+## Running as a background service (Linux + Podman)
+
+`make up` needs a terminal you keep around (or `docker/podman compose up -d`
+detached, which works fine too). If you want socialtrace to start on boot
+and restart itself if it crashes, without a compose file or a login session
+kept open, use the [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html)
+unit files in [`quadlet/`](quadlet/) instead — they run the same containers
+as systemd `--user` services. See [`quadlet/README.md`](quadlet/README.md)
+for setup. Podman only; Quadlet is a Podman/systemd feature, not something
+Docker has an equivalent of.
 
 ## Development
 

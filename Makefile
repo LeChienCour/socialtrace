@@ -13,6 +13,7 @@ help:
 	@echo "  make migrate     Run Alembic migrations against the running db"
 	@echo "  make test        Run backend test suite (real Postgres via testcontainers)"
 	@echo "  make lint        Run backend + frontend lint/type checks"
+	@echo "  make seed        Seed ~6 months of realistic demo data (stack must be running)"
 	@echo "  make clean       Stop the stack and delete its volumes (destroys DB data)"
 	@echo ""
 	@echo "Override the engine with COMPOSE, e.g.: make up COMPOSE=\"docker compose\""
@@ -49,6 +50,10 @@ test:
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy --strict src
 	cd frontend && pnpm lint
+
+.PHONY: seed
+seed: .env
+	set -a && . ./.env && set +a && cd backend && uv sync -q && uv run python scripts/seed_demo.py
 
 .PHONY: clean
 clean:
