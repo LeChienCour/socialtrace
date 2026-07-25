@@ -24,6 +24,10 @@ services:
       SOCIALTRACE_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SOCIALTRACE_API_TOKEN: ${SOCIALTRACE_API_TOKEN}
       SOCIALTRACE_ENVIRONMENT: ${SOCIALTRACE_ENVIRONMENT}
+    volumes:
+      # Read-only: backend only ever reads pre-generated dumps to serve the
+      # download endpoint, never writes here or shells out to pg_dump itself.
+      - backup_data:/backups:ro
     depends_on:
       db:
         condition: service_healthy
@@ -64,14 +68,19 @@ services:
 
   backup:
     build: ./backup
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - backup_data:/backups
     depends_on:
       db:
         condition: service_healthy
-    # Phase 0 stub — reserves the topology slot (own volume, no dependents,
-    # never needs postgres-client in the backend image). Real cron + pg_dump
-    # logic lands in phase 5. See docs/adr/0004.
+    # Daily pg_dump with 7-daily/4-weekly retention. See docs/adr/0004 (why
+    # this topology existed from phase 0) and docs/adr/0006 (why root).
 
 volumes:
   db_data:
