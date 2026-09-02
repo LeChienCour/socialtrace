@@ -28,6 +28,9 @@ async def list_tasks(session: DbSession) -> list[TaskItem]:
     items: list[TaskItem] = []
 
     posts = (await session.execute(select(Post))).scalars().all()
+    accounts_by_id = {
+        account.id: account for account in (await session.execute(select(Account))).scalars().all()
+    }
 
     captured_rows = await session.execute(
         select(PostSnapshot.post_id, PostSnapshot.window_key).where(
@@ -39,6 +42,12 @@ async def list_tasks(session: DbSession) -> list[TaskItem]:
         captured_by_post.setdefault(post_id, set()).add(window_key)
 
     for post in posts:
+        account = accounts_by_id.get(post.account_id)
+        account_label = (
+            f"{account.display_name or account.handle} ({account.platform})"
+            if account is not None
+            else "unknown account"
+        )
         for post_task in compute_post_tasks(
             post_id=post.id,
             published_at=post.published_at,
@@ -49,10 +58,12 @@ async def list_tasks(session: DbSession) -> list[TaskItem]:
                 TaskItem(
                     type="post",
                     target_id=post_task.post_id,
-                    label=post.description or post.url or str(post.id),
+                    label=post.description or post.hook or post.url or str(post.id),
                     window_key=post_task.window_key,
                     status=post_task.status.value,
                     due_since=post_task.due_since,
+                    account_label=account_label,
+                    url=post.url,
                 )
             )
 
@@ -86,6 +97,7 @@ async def list_tasks(session: DbSession) -> list[TaskItem]:
                     window_key=account.capture_cadence,
                     status=account_task.status.value,
                     due_since=account_task.due_since,
+                    account_label=f"@{account.handle} ({account.platform})",
                 )
             )
 

@@ -17,6 +17,14 @@ import { cn } from "@/lib/utils";
 
 type View = "tasks" | "dashboard" | "accounts" | "posts" | "data";
 
+const VIEWS: View[] = ["tasks", "dashboard", "accounts", "posts", "data"];
+const LAST_VIEW_KEY = "socialtrace:last-view";
+
+function loadLastView(): View {
+  const stored = localStorage.getItem(LAST_VIEW_KEY);
+  return VIEWS.includes(stored as View) ? (stored as View) : "tasks";
+}
+
 const TABS: { key: View; label: string; icon: typeof ListTodo }[] = [
   { key: "tasks", label: "Tasks", icon: ListTodo },
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,7 +34,12 @@ const TABS: { key: View; label: string; icon: typeof ListTodo }[] = [
 ];
 
 function App() {
-  const [view, setView] = useState<View>("tasks");
+  const [view, setView] = useState<View>(loadLastView);
+
+  function selectView(next: View) {
+    setView(next);
+    localStorage.setItem(LAST_VIEW_KEY, next);
+  }
 
   return (
     <TokenGate>
@@ -47,7 +60,7 @@ function App() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setView(tab.key)}
+                onClick={() => selectView(tab.key)}
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   view === tab.key &&

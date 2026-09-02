@@ -11,6 +11,7 @@ class PostCreate(BaseModel):
     account_id: UUID
     url: str | None = None
     description: str | None = None
+    hook: str | None = None
     content_type: ContentType | None = None
     campaign: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -30,6 +31,7 @@ class PostUpdate(BaseModel):
 
     url: str | None = None
     description: str | None = None
+    hook: str | None = None
     content_type: ContentType | None = None
     campaign: str | None = None
     tags: list[str] | None = None
@@ -43,6 +45,7 @@ class PostRead(BaseModel):
     account_id: UUID
     url: str | None
     description: str | None
+    hook: str | None
     content_type: str | None
     campaign: str | None
     tags: list[str]

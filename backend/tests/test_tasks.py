@@ -42,6 +42,8 @@ async def test_post_due_appears_in_tray(client: AsyncClient) -> None:
     assert len(post_tasks) == 1
     assert post_tasks[0]["window_key"] == "h24"
     assert post_tasks[0]["status"] == "due"
+    assert post_tasks[0]["url"] == "https://instagram.com/p/abc"
+    assert "acme" in post_tasks[0]["account_label"]
 
 
 async def test_captured_window_excluded_from_tray(client: AsyncClient) -> None:

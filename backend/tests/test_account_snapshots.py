@@ -42,3 +42,27 @@ async def test_snapshot_for_missing_account_404(client: AsyncClient) -> None:
         json={"followers": 100},
     )
     assert response.status_code == 404
+
+
+async def test_update_account_snapshot_fixes_mistyped_value(
+    client: AsyncClient, account_id: str
+) -> None:
+    created = await client.post(f"/accounts/{account_id}/snapshots", json={"followers": 1000})
+    snapshot_id = created.json()["id"]
+
+    response = await client.patch(
+        f"/accounts/{account_id}/snapshots/{snapshot_id}", json={"followers": 1500}
+    )
+    assert response.status_code == 200
+    assert response.json()["followers"] == 1500
+
+
+async def test_delete_account_snapshot(client: AsyncClient, account_id: str) -> None:
+    created = await client.post(f"/accounts/{account_id}/snapshots", json={"followers": 1000})
+    snapshot_id = created.json()["id"]
+
+    response = await client.delete(f"/accounts/{account_id}/snapshots/{snapshot_id}")
+    assert response.status_code == 204
+
+    listed = await client.get(f"/accounts/{account_id}/snapshots")
+    assert listed.json() == []

@@ -121,6 +121,7 @@ export interface Post {
   account_id: string;
   url: string | null;
   description: string | null;
+  hook: string | null;
   content_type: string | null;
   campaign: string | null;
   tags: string[];
@@ -132,15 +133,20 @@ export interface PostCreate {
   account_id: string;
   url?: string | null;
   description?: string | null;
+  hook?: string | null;
   content_type?: ContentType | null;
+  campaign?: string | null;
+  tags?: string[];
   published_at: string;
 }
 
 export interface PostUpdate {
   url?: string | null;
   description?: string | null;
+  hook?: string | null;
   content_type?: ContentType | null;
   campaign?: string | null;
+  tags?: string[];
   published_at?: string;
 }
 
@@ -151,6 +157,8 @@ export interface TaskItem {
   window_key: string;
   status: "due" | "overdue";
   due_since: string;
+  account_label: string;
+  url: string | null;
 }
 
 export interface AccountSnapshotCreate {
@@ -179,6 +187,46 @@ export interface PostSnapshotCreate {
   watch_time_sec?: number | null;
 }
 
+export type PostSnapshotUpdate = PostSnapshotCreate;
+
+export type AccountSnapshotUpdate = AccountSnapshotCreate;
+
+export interface AccountSnapshot {
+  id: string;
+  account_id: string;
+  captured_at: string;
+  period_start: string | null;
+  period_end: string | null;
+  followers: number | null;
+  following: number | null;
+  posts_count: number | null;
+  reach: number | null;
+  impressions: number | null;
+  profile_visits: number | null;
+  link_clicks: number | null;
+  source: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface PostSnapshot {
+  id: string;
+  post_id: string;
+  captured_at: string;
+  window_key: "h24" | "d7" | "d30" | null;
+  views: number | null;
+  reach: number | null;
+  impressions: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  clicks: number | null;
+  watch_time_sec: number | null;
+  source: string;
+  created_at: string;
+}
+
 export interface OverviewResponse {
   total_accounts: number;
   total_posts: number;
@@ -198,7 +246,13 @@ export interface BenchmarkGroup {
 export interface BenchmarksResponse {
   by_platform: BenchmarkGroup[];
   by_content_type: BenchmarkGroup[];
+  by_hour: BenchmarkGroup[];
+  by_weekday: BenchmarkGroup[];
+  by_campaign: BenchmarkGroup[];
+  by_tag: BenchmarkGroup[];
 }
+
+export type BenchmarkDimension = keyof BenchmarksResponse;
 
 export type BenchmarkMetric =
   | "avg_engagement_rate"
@@ -238,11 +292,19 @@ export interface GrowthPoint {
 export interface PostTimelinePoint {
   post_id: string;
   label: string;
+  account_id: string;
+  account_label: string;
+  platform: Platform;
+  content_type: string | null;
+  campaign: string | null;
   published_at: string;
+  published_hour: number;
+  published_weekday: string;
   views: number | null;
   likes: number | null;
   comments: number | null;
   shares: number | null;
+  saves: number | null;
   reach: number | null;
   engagement_rate: number | null;
 }
@@ -252,6 +314,7 @@ export type PostTimelineMetric =
   | "likes"
   | "comments"
   | "shares"
+  | "saves"
   | "reach"
   | "engagement_rate";
 
@@ -287,22 +350,60 @@ export const api = {
   createAccountSnapshot: (
     accountId: string,
     payload: AccountSnapshotCreate,
-  ): Promise<unknown> =>
+  ): Promise<AccountSnapshot> =>
     apiFetch(`/accounts/${accountId}/snapshots`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  listAccountSnapshots: (accountId: string): Promise<AccountSnapshot[]> =>
+    apiFetch(`/accounts/${accountId}/snapshots`),
+  updateAccountSnapshot: (
+    accountId: string,
+    snapshotId: string,
+    payload: AccountSnapshotUpdate,
+  ): Promise<AccountSnapshot> =>
+    apiFetch(`/accounts/${accountId}/snapshots/${snapshotId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteAccountSnapshot: (
+    accountId: string,
+    snapshotId: string,
+  ): Promise<void> =>
+    apiFetch(`/accounts/${accountId}/snapshots/${snapshotId}`, {
+      method: "DELETE",
+    }),
   createPostSnapshot: (
     postId: string,
     payload: PostSnapshotCreate,
-  ): Promise<unknown> =>
+  ): Promise<PostSnapshot> =>
     apiFetch(`/posts/${postId}/snapshots`, {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  getOverview: (): Promise<OverviewResponse> => apiFetch("/analytics/overview"),
-  getBenchmarks: (): Promise<BenchmarksResponse> =>
-    apiFetch("/analytics/benchmarks"),
+  listPostSnapshots: (postId: string): Promise<PostSnapshot[]> =>
+    apiFetch(`/posts/${postId}/snapshots`),
+  updatePostSnapshot: (
+    postId: string,
+    snapshotId: string,
+    payload: PostSnapshotUpdate,
+  ): Promise<PostSnapshot> =>
+    apiFetch(`/posts/${postId}/snapshots/${snapshotId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deletePostSnapshot: (postId: string, snapshotId: string): Promise<void> =>
+    apiFetch(`/posts/${postId}/snapshots/${snapshotId}`, {
+      method: "DELETE",
+    }),
+  getOverview: (accountId?: string): Promise<OverviewResponse> =>
+    apiFetch(
+      `/analytics/overview${accountId ? `?account_id=${accountId}` : ""}`,
+    ),
+  getBenchmarks: (accountId?: string): Promise<BenchmarksResponse> =>
+    apiFetch(
+      `/analytics/benchmarks${accountId ? `?account_id=${accountId}` : ""}`,
+    ),
   getGrowth: (
     accountId: string,
     granularity: GrowthGranularity = "day",
@@ -312,8 +413,10 @@ export const api = {
     ),
   getMonthly: (accountId: string): Promise<MonthlyPoint[]> =>
     apiFetch(`/analytics/monthly?account_id=${accountId}`),
-  getPostsTimeline: (accountId: string): Promise<PostTimelinePoint[]> =>
-    apiFetch(`/analytics/posts-timeline?account_id=${accountId}`),
+  getPostsTimeline: (accountId?: string): Promise<PostTimelinePoint[]> =>
+    apiFetch(
+      `/analytics/posts-timeline${accountId ? `?account_id=${accountId}` : ""}`,
+    ),
   exportJson: (): Promise<void> =>
     downloadFile("/export?format=json", "socialtrace-export.json"),
   exportCsv: (): Promise<void> =>

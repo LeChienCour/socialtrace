@@ -76,8 +76,27 @@ export function CaptureModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Capture {task.window_key} — {task.label}
+            Capture {task.window_key} — {task.account_label}
           </DialogTitle>
+          {task.type === "post" && (
+            <p className="text-sm text-muted-foreground">
+              {task.label}
+              {task.url && (
+                <>
+                  {" "}
+                  ·{" "}
+                  <a
+                    href={task.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-4"
+                  >
+                    open post
+                  </a>
+                </>
+              )}
+            </p>
+          )}
         </DialogHeader>
 
         <form

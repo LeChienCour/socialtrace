@@ -61,3 +61,38 @@ async def test_multiple_adhoc_snapshots_allowed(client: AsyncClient, post_id: st
     second = await client.post(f"/posts/{post_id}/snapshots", json={"views": 20})
     assert first.status_code == 201
     assert second.status_code == 201
+
+
+async def test_update_post_snapshot_fixes_mistyped_value(client: AsyncClient, post_id: str) -> None:
+    created = await client.post(
+        f"/posts/{post_id}/snapshots", json={"window_key": "h24", "views": 100}
+    )
+    snapshot_id = created.json()["id"]
+
+    response = await client.patch(f"/posts/{post_id}/snapshots/{snapshot_id}", json={"views": 1000})
+    assert response.status_code == 200
+    assert response.json()["views"] == 1000
+
+    listed = await client.get(f"/posts/{post_id}/snapshots")
+    assert listed.json()[0]["views"] == 1000
+
+
+async def test_update_post_snapshot_missing_returns_404(client: AsyncClient, post_id: str) -> None:
+    response = await client.patch(
+        f"/posts/{post_id}/snapshots/00000000-0000-0000-0000-000000000000",
+        json={"views": 1},
+    )
+    assert response.status_code == 404
+
+
+async def test_delete_post_snapshot(client: AsyncClient, post_id: str) -> None:
+    created = await client.post(
+        f"/posts/{post_id}/snapshots", json={"window_key": "h24", "views": 100}
+    )
+    snapshot_id = created.json()["id"]
+
+    response = await client.delete(f"/posts/{post_id}/snapshots/{snapshot_id}")
+    assert response.status_code == 204
+
+    listed = await client.get(f"/posts/{post_id}/snapshots")
+    assert listed.json() == []

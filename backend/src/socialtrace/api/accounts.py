@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,11 @@ from socialtrace.api.auth import require_api_token
 from socialtrace.db.session import get_db_session
 from socialtrace.models import Account, AccountSnapshot
 from socialtrace.schemas.account import AccountCreate, AccountRead, AccountUpdate
-from socialtrace.schemas.account_snapshot import AccountSnapshotCreate, AccountSnapshotRead
+from socialtrace.schemas.account_snapshot import (
+    AccountSnapshotCreate,
+    AccountSnapshotRead,
+    AccountSnapshotUpdate,
+)
 
 router = APIRouter(prefix="/accounts", tags=["accounts"], dependencies=[Depends(require_api_token)])
 
@@ -90,3 +94,32 @@ async def create_account_snapshot(
     await session.commit()
     await session.refresh(snapshot)
     return snapshot
+
+
+@router.patch("/{account_id}/snapshots/{snapshot_id}", response_model=AccountSnapshotRead)
+async def update_account_snapshot(
+    account_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    payload: AccountSnapshotUpdate,
+    session: DbSession,
+) -> AccountSnapshot:
+    snapshot = await session.get(AccountSnapshot, snapshot_id)
+    if snapshot is None or snapshot.account_id != account_id:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(snapshot, field, value)
+    await session.commit()
+    await session.refresh(snapshot)
+    return snapshot
+
+
+@router.delete("/{account_id}/snapshots/{snapshot_id}", status_code=204)
+async def delete_account_snapshot(
+    account_id: uuid.UUID, snapshot_id: uuid.UUID, session: DbSession
+) -> Response:
+    snapshot = await session.get(AccountSnapshot, snapshot_id)
+    if snapshot is None or snapshot.account_id != account_id:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+    await session.delete(snapshot)
+    await session.commit()
+    return Response(status_code=204)

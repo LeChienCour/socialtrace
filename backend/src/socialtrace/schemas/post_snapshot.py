@@ -27,6 +27,22 @@ class PostSnapshotCreate(BaseModel):
     source: Source = "manual"
 
 
+class PostSnapshotUpdate(BaseModel):
+    captured_at: datetime | None = None
+    window_key: WindowKey | None = None
+    views: int | None = None
+    reach: int | None = None
+    impressions: int | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
+    saves: int | None = None
+    clicks: int | None = None
+    watch_time_sec: int | None = None
+    raw: dict[str, object] | None = None
+    source: Source | None = None
+
+
 class PostSnapshotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
