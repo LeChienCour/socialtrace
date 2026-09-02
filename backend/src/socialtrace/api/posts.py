@@ -11,7 +11,11 @@ from socialtrace.api.auth import require_api_token
 from socialtrace.db.session import get_db_session
 from socialtrace.models import Post, PostSnapshot
 from socialtrace.schemas.post import PostCreate, PostRead, PostUpdate
-from socialtrace.schemas.post_snapshot import PostSnapshotCreate, PostSnapshotRead
+from socialtrace.schemas.post_snapshot import (
+    PostSnapshotCreate,
+    PostSnapshotRead,
+    PostSnapshotUpdate,
+)
 
 router = APIRouter(prefix="/posts", tags=["posts"], dependencies=[Depends(require_api_token)])
 
@@ -113,3 +117,38 @@ async def create_post_snapshot(
         ) from exc
     await session.refresh(snapshot)
     return snapshot
+
+
+@router.patch("/{post_id}/snapshots/{snapshot_id}", response_model=PostSnapshotRead)
+async def update_post_snapshot(
+    post_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    payload: PostSnapshotUpdate,
+    session: DbSession,
+) -> PostSnapshot:
+    snapshot = await session.get(PostSnapshot, snapshot_id)
+    if snapshot is None or snapshot.post_id != post_id:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(snapshot, field, value)
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="a snapshot for this window already exists for this post"
+        ) from exc
+    await session.refresh(snapshot)
+    return snapshot
+
+
+@router.delete("/{post_id}/snapshots/{snapshot_id}", status_code=204)
+async def delete_post_snapshot(
+    post_id: uuid.UUID, snapshot_id: uuid.UUID, session: DbSession
+) -> Response:
+    snapshot = await session.get(PostSnapshot, snapshot_id)
+    if snapshot is None or snapshot.post_id != post_id:
+        raise HTTPException(status_code=404, detail="snapshot not found")
+    await session.delete(snapshot)
+    await session.commit()
+    return Response(status_code=204)

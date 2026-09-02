@@ -9,8 +9,25 @@ mixing formulas silently would make cross-platform benchmarks meaningless.
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Literal, Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 GrowthGranularity = Literal["day", "week", "month"]
+
+WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def local_publish_slot(published_at: datetime, timezone: str) -> tuple[int, int, str]:
+    """(hour, weekday index, weekday name) of a publish time in the account's
+    own timezone. "Reels at 9am do best" is a statement about the audience's
+    clock, so bucketing by UTC hour would silently shift every account that
+    isn't on UTC into the wrong bucket. An unknown/invalid tz falls back to
+    UTC rather than failing the whole analytics request."""
+    try:
+        tz = ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = ZoneInfo("UTC")
+    local = published_at.astimezone(tz)
+    return local.hour, local.weekday(), WEEKDAY_NAMES[local.weekday()]
 
 
 def compute_engagement_rate(

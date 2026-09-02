@@ -10,7 +10,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, type Post } from "@/lib/api";
+import { api, type ContentType, type Post } from "@/lib/api";
+
+const CONTENT_TYPES: ContentType[] = [
+  "reel",
+  "story",
+  "carousel",
+  "video",
+  "image",
+  "text",
+  "short",
+];
 
 function toDatetimeLocal(iso: string): string {
   const date = new Date(iso);
@@ -28,6 +38,12 @@ export function EditPostModal({
   const queryClient = useQueryClient();
   const [url, setUrl] = useState(post.url ?? "");
   const [description, setDescription] = useState(post.description ?? "");
+  const [hook, setHook] = useState(post.hook ?? "");
+  const [contentType, setContentType] = useState<ContentType | "">(
+    (post.content_type as ContentType | null) ?? "",
+  );
+  const [campaign, setCampaign] = useState(post.campaign ?? "");
+  const [tags, setTags] = useState(post.tags.join(", "));
   const [publishedAt, setPublishedAt] = useState(() =>
     toDatetimeLocal(post.published_at),
   );
@@ -38,6 +54,13 @@ export function EditPostModal({
       api.updatePost(post.id, {
         url: url.trim() || null,
         description: description.trim() || null,
+        hook: hook.trim() || null,
+        content_type: contentType || null,
+        campaign: campaign.trim() || null,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
         published_at: new Date(publishedAt).toISOString(),
       }),
     onSuccess: () => {
@@ -73,6 +96,14 @@ export function EditPostModal({
           }}
         >
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-description">Title / description</Label>
+            <Input
+              id="edit-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-url">URL</Label>
             <Input
               id="edit-url"
@@ -81,11 +112,47 @@ export function EditPostModal({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-description">Description</Label>
+            <Label htmlFor="edit-hook">Hook</Label>
             <Input
-              id="edit-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              id="edit-hook"
+              value={hook}
+              onChange={(event) => setHook(event.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-content_type">Content type</Label>
+              <select
+                id="edit-content_type"
+                className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                value={contentType}
+                onChange={(event) =>
+                  setContentType(event.target.value as ContentType | "")
+                }
+              >
+                <option value="">—</option>
+                {CONTENT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-campaign">Campaign</Label>
+              <Input
+                id="edit-campaign"
+                value={campaign}
+                onChange={(event) => setCampaign(event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
+            <Input
+              id="edit-tags"
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1.5">

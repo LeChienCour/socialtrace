@@ -1,10 +1,67 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { EditSnapshotModal } from "@/components/EditSnapshotModal";
 import { LogAccountSnapshotModal } from "@/components/LogAccountSnapshotModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type Account, api, type Platform } from "@/lib/api";
+import {
+  type Account,
+  type AccountSnapshot,
+  api,
+  type Platform,
+} from "@/lib/api";
+
+function AccountSnapshotHistory({ accountId }: { accountId: string }) {
+  const { data: snapshots, isPending } = useQuery({
+    queryKey: ["account-snapshots", accountId],
+    queryFn: () => api.listAccountSnapshots(accountId),
+  });
+  const [editing, setEditing] = useState<AccountSnapshot | null>(null);
+
+  if (isPending) {
+    return <p className="text-xs text-muted-foreground">Loading captures…</p>;
+  }
+  if (!snapshots?.length) {
+    return (
+      <p className="text-xs text-muted-foreground">No captures logged yet.</p>
+    );
+  }
+
+  return (
+    <>
+      <ul className="flex flex-col gap-1">
+        {snapshots.map((snapshot) => (
+          <li
+            key={snapshot.id}
+            className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1 text-xs"
+          >
+            <span>
+              {new Date(snapshot.captured_at).toLocaleString()} ·{" "}
+              {snapshot.followers ?? "–"} followers
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => setEditing(snapshot)}
+            >
+              Edit
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {editing && (
+        <EditSnapshotModal
+          kind="account"
+          accountId={accountId}
+          snapshot={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
+  );
+}
 
 const PLATFORMS: Platform[] = [
   "instagram",
@@ -24,6 +81,7 @@ export function AccountsScreen() {
   });
 
   const [snapshotAccount, setSnapshotAccount] = useState<Account | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [handle, setHandle] = useState("");
@@ -103,25 +161,40 @@ export function AccountsScreen() {
           <li className="text-sm text-muted-foreground">Loading…</li>
         )}
         {accounts?.map((account) => (
-          <li
-            key={account.id}
-            className="flex items-center justify-between rounded-lg border p-3 text-sm"
-          >
-            <span>
-              <span className="font-medium">
-                {account.display_name || account.handle}
-              </span>{" "}
-              <span className="text-muted-foreground">
-                @{account.handle} · {account.platform}
+          <li key={account.id} className="rounded-lg border p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span>
+                <span className="font-medium">
+                  {account.display_name || account.handle}
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  @{account.handle} · {account.platform}
+                </span>
               </span>
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSnapshotAccount(account)}
-            >
-              Log snapshot
-            </Button>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setExpanded(expanded === account.id ? null : account.id)
+                  }
+                >
+                  {expanded === account.id ? "Hide captures" : "Captures"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSnapshotAccount(account)}
+                >
+                  Log snapshot
+                </Button>
+              </div>
+            </div>
+            {expanded === account.id && (
+              <div className="mt-3 border-t pt-3">
+                <AccountSnapshotHistory accountId={account.id} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

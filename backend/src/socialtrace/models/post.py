@@ -23,6 +23,9 @@ class Post(Base):
     )
     url: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The opening line/attention-grabber of the caption — tracked separately
+    # from description so hook style can be compared across posts.
+    hook: Mapped[str | None] = mapped_column(String, nullable=True)
     # Validated as an enum at the app layer (see schemas.post.ContentType).
     content_type: Mapped[str | None] = mapped_column(String, nullable=True)
     campaign: Mapped[str | None] = mapped_column(String, nullable=True)

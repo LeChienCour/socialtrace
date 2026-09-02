@@ -14,3 +14,7 @@ class TaskItem(BaseModel):
     window_key: str
     status: Literal["due", "overdue"]
     due_since: datetime
+    # Account context so a post task is identifiable without opening its
+    # link — which account it belongs to and, for posts, the link itself.
+    account_label: str
+    url: str | None = None

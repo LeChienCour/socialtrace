@@ -86,6 +86,77 @@ async def test_benchmarks_groups_by_platform_and_content_type(
     assert any(g["key"] == "reel" for g in body["by_content_type"])
 
 
+async def test_benchmarks_groups_by_hour_and_weekday(client: AsyncClient, post_id: str) -> None:
+    await client.post(
+        f"/posts/{post_id}/snapshots",
+        json={"window_key": "h24", "likes": 10, "reach": 100},
+    )
+
+    response = await client.get("/analytics/benchmarks")
+    body = response.json()
+    # The fixture publishes at 2026-01-01T00:00:00Z on a UTC account, so the
+    # slot is midnight Thursday in the account's own timezone.
+    assert [g["key"] for g in body["by_hour"]] == ["00:00"]
+    assert [g["key"] for g in body["by_weekday"]] == ["Thu"]
+
+
+async def test_benchmarks_filtered_by_account(client: AsyncClient, post_id: str) -> None:
+    other = await client.post("/accounts", json={"platform": "tiktok", "handle": "other"})
+    other_id = other.json()["id"]
+    other_post = await client.post(
+        "/posts",
+        json={
+            "account_id": other_id,
+            "url": "https://tiktok.com/@other/video/1",
+            "content_type": "short",
+            "published_at": "2026-01-02T00:00:00Z",
+        },
+    )
+    await client.post(
+        f"/posts/{other_post.json()['id']}/snapshots",
+        json={"window_key": "h24", "likes": 5, "reach": 50},
+    )
+    await client.post(
+        f"/posts/{post_id}/snapshots",
+        json={"window_key": "h24", "likes": 10, "reach": 100},
+    )
+
+    unfiltered = (await client.get("/analytics/benchmarks")).json()
+    assert len(unfiltered["by_platform"]) == 2
+
+    filtered = (await client.get("/analytics/benchmarks", params={"account_id": other_id})).json()
+    assert [g["key"] for g in filtered["by_platform"]] == ["tiktok"]
+
+
+async def test_posts_timeline_without_account_covers_every_account(
+    client: AsyncClient, post_id: str
+) -> None:
+    await client.post(
+        f"/posts/{post_id}/snapshots",
+        json={"window_key": "h24", "likes": 10, "reach": 100},
+    )
+
+    response = await client.get("/analytics/posts-timeline")
+    assert response.status_code == 200
+    points = response.json()
+    assert len(points) == 1
+    assert points[0]["account_label"] == "acme"
+    assert points[0]["platform"] == "instagram"
+    assert points[0]["content_type"] == "reel"
+    assert points[0]["published_hour"] == 0
+    assert points[0]["published_weekday"] == "Thu"
+    assert points[0]["engagement_rate"] == 10 / 100
+
+
+async def test_overview_filtered_by_account(client: AsyncClient, post_id: str) -> None:
+    other = await client.post("/accounts", json={"platform": "tiktok", "handle": "other"})
+    other_id = other.json()["id"]
+
+    body = (await client.get("/analytics/overview", params={"account_id": other_id})).json()
+    assert body["total_accounts"] == 1
+    assert body["total_posts"] == 0
+
+
 async def test_growth_returns_bucketed_points(client: AsyncClient, account_id: str) -> None:
     await client.post(
         f"/accounts/{account_id}/snapshots",

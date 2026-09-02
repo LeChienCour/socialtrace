@@ -23,6 +23,22 @@ class AccountSnapshotCreate(BaseModel):
     note: str | None = None
 
 
+class AccountSnapshotUpdate(BaseModel):
+    captured_at: datetime | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    followers: int | None = None
+    following: int | None = None
+    posts_count: int | None = None
+    reach: int | None = None
+    impressions: int | None = None
+    profile_visits: int | None = None
+    link_clicks: int | None = None
+    raw: dict[str, object] | None = None
+    source: Source | None = None
+    note: str | None = None
+
+
 class AccountSnapshotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
